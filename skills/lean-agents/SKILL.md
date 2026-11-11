@@ -41,8 +41,19 @@ The principle: **the lowest cost at the same quality, keeping the parallelism.**
 8. Rewrite `STATE.md` at each checkpoint: after a commit, a test result or a review.
 9. **Before every commit:** the secret scan as its own step, then the commit, with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (the owner's rule, whatever model you run on).
 
+## Builder self-check (before handing work to a review)
+Go through this list and say in your report that you did (cheap on Sonnet; it saves Opus review rounds):
+1. **The brief, point by point:** every item done, or listed as not done with the reason.
+2. **Every caller of what you changed** (`grep -n`), and the shared function fixed rather than one path.
+3. **Tests:** each change has a test that fails without it (delete the change, watch it fail, restore it), plus the edge cases: empty, missing, concurrent, a retry or replay, a failure part-way.
+4. **Errors and cleanup:** every new failure path is handled and leaves no half-written state, temp file or held lock.
+5. **Security:** no secret, key, account id or email in code, logs or tests; nothing reads env files.
+6. **The docs and twins** that describe the changed behaviour are updated in the same commit.
+7. **The secret scan** comes before the commit, using the exact test commands from `gateway-rules`.
+
 ## Reviews (quality is never traded for cost)
 - First review: a `reviewer` (Opus high), given the code, not the author's conclusions.
+- **The follow-up brief** (the lead writes it, to keep follow-ups small): the earlier review file, the fix commit range (`git diff <before>..<after>`), the list of files the fix touches, and their direct callers. Not "review the branch". The reviewer checks each earlier finding, then what those changes could affect. Lookups go to scouts.
 - After **every** fix, another round: a `reviewer` if the fix changed logic, a `checker` if it changed only text. Repeat until nothing Critical, High or Medium remains and the tests pass. There is no cap on rounds. If round 3 still finds new problems, a `thinker` checks the design itself.
 
 ## Changing an agent type

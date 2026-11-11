@@ -42,6 +42,9 @@ The principle: **the lowest cost at the same quality, keeping the parallelism.**
 - First review: a `reviewer` (Opus high), given the code, not the author's conclusions.
 - After **every** fix, another round: a `reviewer` if the fix changed logic, a `checker` if it changed only text. Repeat until nothing Critical, High or Medium remains and the tests pass. There is no cap on rounds. If round 3 still finds new problems, a `thinker` checks the design itself.
 
+## Changing an agent type
+Claude Code reads agent definitions when a session starts. An edit to a type's model or effort applies only in **new** sessions. Until then, in the current session, pass the new `effort` explicitly when starting that agent, and check the run's recorded effort in the ledger.
+
 ## Quality log
 When the owner, a reviewer, a checker or CI finds a quality miss by an agent, the main chat adds a row to `~/.claude/lean-system/quality-log.md`: the type, model and effort, what was wrong, who caught it, and whether the agent's own checks should have caught it. The weekly tune-up uses it to set each type's effort (see the `cost-tuneup` skill).
 

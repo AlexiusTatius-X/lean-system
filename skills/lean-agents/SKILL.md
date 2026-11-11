@@ -30,7 +30,8 @@ The principle: **the lowest cost at the same quality, keeping the parallelism.**
 ## Memory rules (every agent)
 1. Start from the track's `STATE.md` (`gateway-evidence/tracks/<track>/STATE.md`), not from history. Never resume an old agent for a new job.
 2. One job, then end with a report of 10 lines or fewer. Details go in `STATE.md` or the evidence folder.
-3. Heavy runs (`test:int`, `test:process`, Playwright, db/e2e Jest, mutation runs, `docker compose up`) go only through
+3. **How to start a heavy run so you're woken:** call the Bash tool with `run_in_background: true` and the command `~/.claude/lean-system/tools/run-locked.sh <label> <workdir> -- <command>`. **Never use `&`, `nohup` or `setsid`**: a detached run never wakes you, and the track stalls. Its summary is always at `~/Desktop/EtherealLabs_MasterRepo/gateway-evidence/runs/<YYYY-MM-DD>/<label>.summary` (the full log is beside it, `.log`). Several runs: one background call each, or one call chaining them with `&&`.
+   Heavy runs (`test:int`, `test:process`, Playwright, db/e2e Jest, mutation runs, `docker compose up`) go only through
    `~/.claude/lean-system/tools/run-locked.sh <label> <workdir> -- <command>` **in the background**. Then end your turn; you are woken once. Read the `.summary`, and if something failed, `grep -n -A30 '<test name>'` the log. **Never read whole logs.**
 4. Waiting for CI: `~/.claude/lean-system/tools/wait-ci.sh <owner/repo> <pr>` in the background, then end your turn.
 5. **Never poll** (`sleep` loops, a foreground `--watch`, repeated status checks). A hook blocks it.

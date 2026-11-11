@@ -14,6 +14,11 @@ Run it as one `designer`-class job (Opus high). The input is small, so never rea
 4. The quality signals from `gateway-evidence/tracks/*/STATE.md` "Reviews:" lines: findings by severity, rounds, escalations and CI failures.
 
 ## Output: `~/.claude/lean-system/tuneups/<date>.md`
+- **First, and required every time: the effort calibration table.** This is the loop's main job: the cheapest model and effort per agent type that still meets the quality bar. One row per agent type:
+
+  | Type | Current rung (model / effort) | Jobs this week | Quality misses (from quality-log.md) | Cost per finished job (incl. rework) | Decision: hold / step up / trial a step down | Why |
+
+  Apply the rules under "Effort calibration" below. A type with no jobs this week holds.
 - **The week in numbers:** the total, the trend against last week, the top 3 cost drivers, and the waiting share.
 - **Quality check:** did review findings, rounds, escalations or CI failures rise? If a change made last week worsened quality, propose reverting it, first.
 - **Proposals:** at most 5, ranked by expected saving. Each states:

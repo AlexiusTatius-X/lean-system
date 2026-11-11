@@ -33,11 +33,13 @@ The principle: **the lowest cost at the same quality, keeping the parallelism.**
 3. **How to start a heavy run so you're woken:** call the Bash tool with `run_in_background: true` and the command `~/.claude/lean-system/tools/run-locked.sh <label> <workdir> -- <command>`. **Never use `&`, `nohup` or `setsid`**: a detached run never wakes you, and the track stalls. Its summary is always at `~/Desktop/EtherealLabs_MasterRepo/gateway-evidence/runs/<YYYY-MM-DD>/<label>.summary` (the full log is beside it, `.log`). Several runs: one background call each, or one call chaining them with `&&`.
    Heavy runs (`test:int`, `test:process`, Playwright, db/e2e Jest, mutation runs, `docker compose up`) go only through
    `~/.claude/lean-system/tools/run-locked.sh <label> <workdir> -- <command>` **in the background**. Then end your turn; you are woken once. Read the `.summary`, and if something failed, `grep -n -A30 '<test name>'` the log. **Never read whole logs.**
+   **Don't report before your run finishes.** If you started a background run you still need, end your turn **without** your final report. You'll be resumed when it exits. Report only once you have its result. Handing back early leaves the run orphaned.
 4. Waiting for CI: `~/.claude/lean-system/tools/wait-ci.sh <owner/repo> <pr>` in the background, then end your turn.
 5. **Never poll** (`sleep` loops, a foreground `--watch`, repeated status checks). A hook blocks it.
 6. Read sections, not whole files: `grep -n` first, then a line range. Large docs are read by section. Broad searches go to a scout.
 7. Targeted tests: run them directly, but trim the output: `… 2>&1 | tail -40`.
 8. Rewrite `STATE.md` at each checkpoint: after a commit, a test result or a review.
+9. **Before every commit:** the secret scan as its own step, then the commit, with the trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` (the owner's rule, whatever model you run on).
 
 ## Reviews (quality is never traded for cost)
 - First review: a `reviewer` (Opus high), given the code, not the author's conclusions.

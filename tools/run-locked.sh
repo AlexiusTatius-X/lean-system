@@ -40,7 +40,7 @@ secs=$(( $(date +%s) - start ))
 
 {
   echo "$label: exit $rc in ${secs}s; load $(uptime | sed 's/.*averages: //')"
-  grep -E '^(Test Suites|Tests|Snapshots):' "$log" | tail -3
+  grep -E '(Test Suites|Tests|Snapshots):' "$log" | tail -8
   grep -E '^[[:space:]]*[0-9]+ (passed|failed|flaky|skipped)' "$log" | tail -4
   grep -E '^(FAIL |  ● |[[:space:]]+✘)' "$log" | sed 's/^[[:space:]]*//' | sort -u | head -8
   echo "full log: $log"

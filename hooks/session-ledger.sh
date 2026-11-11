@@ -7,6 +7,10 @@ y=$(TZ=Asia/Kolkata date -v-1d +%Y-%m-%d); t=$(TZ=Asia/Kolkata date +%Y-%m-%d)
 if [ ! -f "$L/ledger/$y.md" ]; then
   perl -e 'alarm 25; exec @ARGV' python3 -I "$L/tools/cost-ledger.py" "$y" >/dev/null 2>&1
 fi
+# CI usage runs in the background (about 30 s at most), so it never counts against the hook timeout.
+if [ -f "$L/ledger/$y.md" ] && ! grep -q '^## GitHub Actions' "$L/ledger/$y.md"; then
+  (perl -e 'alarm 45; exec @ARGV' python3 -I "$L/tools/cost-ledger.py" "$y" --ci >/dev/null 2>&1 </dev/null &) >/dev/null 2>&1
+fi
 [ -f "$L/ledger/$y.md" ] && echo "Lean system: yesterday's cost ledger is at $L/ledger/$y.md ($(sed -n 3p "$L/ledger/$y.md" | tr -d '*'))."
 last=$(ls -t "$L"/tuneups/*.md 2>/dev/null | head -1)
 if [ -z "$last" ] || [ -n "$(find "$last" -mtime +7 2>/dev/null)" ]; then

@@ -8,8 +8,8 @@ description: The weekly review that makes the lean agent system cheaper without 
 Run it as one `designer`-class job (Opus high). The input is small, so never read raw transcripts.
 
 ## Inputs (only these)
-1. Refresh the ledger: `python3 ~/.claude/lean-system/tools/cost-ledger.py <each day of the week>`.
-2. Read the week's `~/.claude/lean-system/ledger/<date>.md` files: the totals, the type and step-kind tables, and the waste lists.
+1. Refresh the ledger: `python3 ~/.claude/lean-system/tools/cost-ledger.py <each day of the week> --ci`.
+2. Read the week's `~/.claude/lean-system/ledger/<date>.md` files: the totals, the type and step-kind tables, the waste lists, and the "## GitHub Actions" section (CI runs, jobs, billed minutes per repo, workflow and event, top jobs, runs GitHub refused to start). Also `ledger/ci.csv` (`day,repo,runs,jobs,minutes`) for the week's trend. Refresh CI with `--ci` on each day. The tune-up proposes CI changes (fewer runs, cached or merged jobs, path filters) exactly like token ones: ranked by expected saving, with a quality check.
 3. `~/.claude/lean-system/experiments.md`: what was tried and its result. Also `quality-log.md`: every quality miss, by agent type.
 4. The quality signals from `gateway-evidence/tracks/*/STATE.md` "Reviews:" lines: findings by severity, rounds, escalations and CI failures.
 

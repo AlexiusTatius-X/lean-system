@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Daily cost ledger for Claude Code work. Reads transcripts only; uses no model.
 
-Usage: cost-ledger.py [YYYY-MM-DD ...]   (default: yesterday and today, IST)
+Usage: cost-ledger.py [YYYY-MM-DD ...] [--ci]   (default: yesterday and today, IST)
+--ci also adds a "## GitHub Actions" section (via gh, at most ~30 s) and appends ledger/ci.csv.
 Writes ~/.claude/lean-system/ledger/<date>.md and appends to ledger.csv.
 Prices are API list rates per million tokens (input, output, cache read); a cache write is 1.25x input.
 """
-import csv, datetime as dt, glob, json, os, re, sys
+import csv, datetime as dt, glob, json, math, os, re, subprocess, sys, time
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 HOME = os.path.expanduser('~')
 PROJECTS = os.path.join(HOME, '.claude', 'projects')
 OUT = os.path.join(HOME, '.claude', 'lean-system', 'ledger')
 IST = dt.timezone(dt.timedelta(hours=5, minutes=30))
+CI_ORG, CI_REPOS, CI_BUDGET = 'ethereallabsdev', ['tokitoki-provider-gateway', 'tokitoki-production'], 28
 PRICES = {'opus-5-5': (4, 20, 0.20), 'opus-5': (5, 25, 0.50), 'sonnet-5-5': (2, 10, 0.10), 'sonnet-5': (2, 10, 0.20),
           'haiku-5-5': (0.10, 0.50, 0.01), 'fable-5-2': (8, 40, 0.20), 'fable-5-1': (10, 50, 1.0)}
 
@@ -96,9 +99,116 @@ def load(path, main):
     return meta, steps
 
 
+def gh(path, deadline):
+    left = deadline - time.time()
+    if left <= 1:
+        raise TimeoutError('time budget used')
+    r = subprocess.run(['gh', 'api', path], capture_output=True, text=True, timeout=left)
+    if r.returncode:
+        raise RuntimeError(r.stderr.strip()[:200])
+    return json.loads(r.stdout)
+
+
+def parse_ts(v):
+    return dt.datetime.fromisoformat(v.replace('Z', '+00:00')) if v else None
+
+
+def ci_collect(day, deadline):
+    start = dt.datetime.fromisoformat(day).replace(tzinfo=IST).astimezone(dt.timezone.utc)
+    rng = f"{start:%Y-%m-%dT%H:%M:%SZ}..{start + dt.timedelta(days=1) - dt.timedelta(seconds=1):%Y-%m-%dT%H:%M:%SZ}"
+    out = {}
+    for repo in CI_REPOS:
+        base = f"repos/{CI_ORG}/{repo}/actions"
+        runs, page = [], 1
+        while True:
+            d = gh(f"{base}/runs?created={rng}&per_page=100&page={page}", deadline)
+            runs += d.get('workflow_runs', [])
+            if len(d.get('workflow_runs', [])) < 100:
+                break
+            page += 1
+
+        def jobs_of(run):
+            got, pg = [], 1
+            while True:
+                d = gh(f"{base}/runs/{run['id']}/jobs?filter=all&per_page=100&page={pg}", deadline)
+                got += d.get('jobs', [])
+                if len(d.get('jobs', [])) < 100:
+                    return got
+                pg += 1
+        with ThreadPoolExecutor(8) as ex:
+            job_lists = list(ex.map(jobs_of, runs))
+        out[repo] = (runs, job_lists)
+    return out
+
+
+def ci_section(day, deadline):
+    """Returns (markdown lines, csv rows). Never raises."""
+    try:
+        data = ci_collect(day, deadline)
+        refused, top = [], []
+        per_wf, tot = defaultdict(lambda: [0, 0, 0]), {}
+        for repo, (runs, job_lists) in data.items():
+            jobs_n = mins = 0
+            for run, jobs in zip(runs, job_lists):
+                wf = (run.get('name') or '?', run.get('event') or '?')
+                per_wf[wf][0] += 1
+                for j in jobs:
+                    if j.get('conclusion') == 'skipped':
+                        continue
+                    a, b = parse_ts(j.get('started_at')), parse_ts(j.get('completed_at'))
+                    m = math.ceil(max((b - a).total_seconds(), 0) / 60) if a and b else 0
+                    jobs_n += 1
+                    mins += m
+                    per_wf[wf][1] += 1
+                    per_wf[wf][2] += m
+                    top.append((m, repo, run.get('name'), j.get('name')))
+                    if j.get('conclusion') == 'failure' and not any(s.get('conclusion') for s in j.get('steps') or []):
+                        why = 'no steps run'
+                        try:
+                            ann = gh(f"repos/{CI_ORG}/{repo}/check-runs/{j['id']}/annotations", deadline)
+                            hit = [x.get('message', '') for x in ann if re.search(r'payment|spending limit', x.get('message', ''), re.I)]
+                            if hit:
+                                why = hit[0][:110]
+                        except Exception:
+                            pass
+                        refused.append(f"{repo}: {run.get('name')} / {j.get('name')} (run {run['id']}): {why}")
+            tot[repo] = (len(runs), jobs_n, mins)
+        lines = ["", "## GitHub Actions (billed minutes: each job rounded up, skipped jobs excluded)",
+                 "| Repo | Runs | Jobs | Minutes |", "|---|---|---|---|"]
+        lines += [f"| {r} | {a} | {b} | {c} |" for r, (a, b, c) in tot.items()]
+        lines += ["", "| Workflow | Event | Runs | Jobs | Minutes |", "|---|---|---|---|---|"]
+        lines += [f"| {w} | {e} | {v[0]} | {v[1]} | {v[2]} |" for (w, e), v in sorted(per_wf.items(), key=lambda kv: -kv[1][2])]
+        lines += ["", "Top 5 jobs by minutes:"]
+        lines += [f"- {m} min: {r} / {w} / {n}" for m, r, w, n in sorted(top, key=lambda t: -t[0])[:5]] or ["- none"]
+        lines += ["", "Runs GitHub refused to start:"] + ([f"- {x}" for x in refused] or ["- none"])
+        return lines, [[day, r, a, b, c] for r, (a, b, c) in tot.items()]
+    except Exception as e:
+        why = 'gh not installed' if isinstance(e, FileNotFoundError) else 'over the time budget' if isinstance(e, (TimeoutError, subprocess.TimeoutExpired)) else 'gh failed (not logged in or offline?)'
+        return ["", "## GitHub Actions", f"CI usage wasn't available for {day}: {why}."], None
+
+
+def add_ci(day, deadline):
+    lines, rows = ci_section(day, deadline)
+    path = os.path.join(OUT, f"{day}.md")
+    old = open(path).read() if os.path.exists(path) else f"# Cost ledger {day} (API list rates)\n\nNo token usage found.\n"
+    old = re.split(r'\n## GitHub Actions', old)[0].rstrip('\n') + '\n'
+    open(path, 'w').write(old + "\n".join(lines) + "\n")
+    if rows:
+        cp = os.path.join(OUT, 'ci.csv')
+        keep = []
+        if os.path.exists(cp):
+            keep = [r for r in csv.reader(open(cp)) if r and r[0] != day and r[0] != 'day']
+        with open(cp, 'w', newline='') as fh:
+            w = csv.writer(fh)
+            w.writerow(['day', 'repo', 'runs', 'jobs', 'minutes'])
+            w.writerows(keep + rows)
+
+
 def main():
     today = dt.datetime.now(IST).date()
-    days = sys.argv[1:] or [str(today - dt.timedelta(days=1)), str(today)]
+    args = [a for a in sys.argv[1:] if a != '--ci']
+    ci = '--ci' in sys.argv[1:]
+    days = args or [str(today - dt.timedelta(days=1)), str(today)]
     os.makedirs(OUT, exist_ok=True)
     runs = []  # (day, project, session, agent file, meta, steps for day)
     cutoff = min(dt.date.fromisoformat(d) for d in days) - dt.timedelta(days=1)
@@ -161,6 +271,10 @@ def main():
                 w.writerow([d, k, f"{v:.4f}"])
         top = ", ".join(f"{k.split(' / ')[0]} ${v:.0f}" for k, v in sorted(by_type.items(), key=lambda kv: -kv[1])[:3])
         print(f"Cost {d}: ~${total:.0f} (waiting {100 * by_kind.get('wait', 0) / total:.0f}%; top: {top}). Ledger: {os.path.join(OUT, d + '.md')}")
+    if ci:
+        deadline = time.time() + CI_BUDGET
+        for d in days:
+            add_ci(d, deadline)
 
 
 if __name__ == '__main__':

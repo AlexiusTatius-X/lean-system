@@ -1,0 +1,3 @@
+ledger/*.md
+ledger/ledger.csv
+__pycache__/

@@ -21,7 +21,9 @@ Work in worktrees under `~/Desktop/EtherealLabs_MasterRepo/gateway-tracks/`, nev
 
 ## Tests
 - Node 24: `export PATH=~/.local/node-v24.22.1-darwin-arm64/bin:$PATH`. Docker via Colima (`run-locked.sh` starts it). Terraform at `~/.local/bin/terraform`.
-- **Full unit suite:** `npx jest --selectProjects unit`, leaving out `placeholder-register.spec.ts` explicitly. **Never put a file path after `--selectProjects`**: it is read as a project name and runs everything.
+- **Full unit suite: use exactly this command.** `--testPathIgnorePatterns` *replaces* the project's own ignore list, so the project's ignores must be repeated, or the dashboard specs get pulled in and fail:
+  `npx jest --selectProjects unit --testPathIgnorePatterns '/node_modules/' 'packages/gateway-client/test/contract/' 'apps/dashboard/' 'placeholder-register.spec.ts'`
+  The dashboard specs are their own project: `npx jest --selectProjects dashboard`. **Never put a file path after `--selectProjects`**: it is read as a project name and runs everything.
 - **Targeted tests:** `npx jest <paths>` (check with `--listTests`; use `--runTestsByPath` for bracketed paths). For db specs, the path comes first and `--selectProjects db` last.
 - **Heavy suites** (`test:int`, `test:process`, Playwright, db/e2e projects, mutation runs) run only through `run-locked.sh`, one at a time, in the background.
 - Known flakes: `race/live.spec` R13, R14 and R20; `call-counts.spec` (the lock race); `usage-reports.spec` "reads 31 days…" (planner statistics). See `gateway-evidence/2026-11-11/merge-coordinator/known-flakes.md`. Re-run before concluding.

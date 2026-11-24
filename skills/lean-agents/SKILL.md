@@ -54,7 +54,8 @@ Go through this list and say in your report that you did (cheap on Sonnet; it sa
 ## Reviews (quality is never traded for cost)
 - First review: a `reviewer` (Opus high), given the code, not the author's conclusions.
 - **The follow-up brief** (the lead writes it, to keep follow-ups small): the earlier review file, the fix commit range (`git diff <before>..<after>`), the list of files the fix touches, and their direct callers. Not "review the branch". The reviewer checks each earlier finding, then what those changes could affect. Lookups go to scouts.
-- After **every** fix, another round: a `reviewer` if the fix changed logic, a `checker` if it changed only text. Repeat until nothing Critical, High or Medium remains and the tests pass. There is no cap on rounds. If round 3 still finds new problems, a `thinker` checks the design itself.
+- **CI is the test gate (owner, 13 Nov 2026).** No full local test suite before pushing a PR (Studio's `api-suite.sh` included): run only the specs you write or change, plus the quick checks (tsc, lint, baseline, format); CI runs the full suite. Fix and push again on a real CI failure; re-run once on a timeout or memory flake.
+- **One review round per change (owner, 13 Nov 2026).** The builder writes it right first: self-check against the list above and past review findings, and run CI's exact checks before review. The `reviewer` does one exhaustive pass, listing every finding with its fix. After the fixes, a `checker` (not a second review) verifies each one and reruns the checks. A second `reviewer` pass only if a fix rewrote money logic (paid call, ledger, usage) beyond a few lines; record why in STATE.md.
 
 ## Changing an agent type
 Claude Code reads agent definitions when a session starts. An edit to a type's model or effort applies only in **new** sessions. Until then, in the current session, pass the new `effort` explicitly when starting that agent, and check the run's recorded effort in the ledger.

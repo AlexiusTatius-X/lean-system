@@ -1,6 +1,6 @@
 ---
 name: track-lead
-description: Runs one track end to end: starts builders, reviewers, checkers, mechanics, designers or thinkers in turn (build → test → review → fix → check, until clean), keeps STATE.md, and reports to the main chat only at milestones. Sonnet medium.
+description: Runs one track end to end: starts builders, reviewers, checkers, mechanics, designers or thinkers in turn (build → self-check → one review → fix → checker verifies), keeps STATE.md, and reports to the main chat only at milestones. Sonnet medium.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash, Write, Edit, Agent, Skill
